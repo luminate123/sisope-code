@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electron App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4C+6Xj5Y0N5UQbZj5f3G4e5y6js3TmUnHt0B8D/Zy0fzj5V+FpbL+JPL8YHCgYz4OU+Rw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+
+        h1 {
+            color: #444;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .container {
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn i {
+            margin-right: 8px;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .progress {
+            background-color: #e9ecef;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .progress::after {
+            content: attr(data-progress);
+            position: absolute;
+            right: 10px;
+            top: 5px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #007bff;
+            border-radius: 20px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Comprimir Archivos</h1>
+        
+        <button id="select-files-button" class="btn"><i class="fas fa-file"></i> Seleccionar Archivos</button>
+        <button id="select-folders-button" class="btn"><i class="fas fa-folder"></i> Seleccionar Carpetas</button>
+        <p id="file-count">No se han seleccionado archivos o carpetas.</p>
+        
+        <input type="text" id="zip-name" class="input-field" placeholder="Nombre del archivo ZIP" />
+        <button id="compress-files-button" class="btn"><i class="fas fa-compress"></i> Comprimir Archivos</button>
+        
+        <div id="compression-progress-files" class="progress hidden" data-progress="Progreso Archivos: 0%">
+            <div class="progress-bar" id="progress-bar-files"></div>
+        </div>
+        <div id="compression-progress-folders" class="progress hidden" data-progress="Progreso Carpetas: 0%">
+            <div class="progress-bar" id="progress-bar-folders"></div>
+        </div>
+        
+        <button id="back-button" class="btn"><i class="fas fa-arrow-left"></i> Regresar</button>
+    </div>
+    
+    <script>
+        let selectedFilePaths = [];
+        let selectedFolderPaths = [];
+
+        document.getElementById('select-files-button').addEventListener('click', async () => {
+            selectedFilePaths = await window.electron.selectFiles('files');
+            document.getElementById('file-count').textContent = `Archivos seleccionados: ${selectedFilePaths.length}`;
+            console.log('Archivos seleccionados:', selectedFilePaths);
+        });
+
+        document.getElementById('select-folders-button').addEventListener('click', async () => {
+            selectedFolderPaths = await window.electron.selectFiles('folders');
+            document.getElementById('file-count').textContent = `Carpetas seleccionadas: ${selectedFolderPaths.length}`;
+            console.log('Carpetas seleccionadas:', selectedFolderPaths);
+        });
+
+        document.getElementById('compress-files-button').addEventListener('click', async () => {
+            const combinedPaths = [...selectedFilePaths, ...selectedFolderPaths];
+            if (combinedPaths.length > 0) {
+                const zipName = document.getElementById('zip-name').value || 'output';
+                const outputFilePath = await window.electron.saveFile(`${zipName}.zip`);
+
+                if (outputFilePath) {
+                    window.electron.on('compression-progress', (event, progressPercent) => {
+                        if (selectedFilePaths.length > 0) {
+                            document.getElementById('compression-progress-files').classList.remove('hidden');
+                            document.getElementById('progress-bar-files').style.width = `${progressPercent}%`;
+                            document.getElementById('compression-progress-files').setAttribute('data-progress', `Progreso Archivos: ${progressPercent}%`);
+                        }
+                        if (selectedFolderPaths.length > 0) {
+                            document.getElementById('compression-progress-folders').classList.remove('hidden');
+                            document.getElementById('progress-bar-folders').style.width = `${progressPercent}%`;
+                            document.getElementById('compression-progress-folders').setAttribute('data-progress', `Progreso Carpetas: ${progressPercent}%`);
+                        }
+                    });
+                    await window.electron.compressFiles(combinedPaths, outputFilePath);
+                    alert('Archivos comprimidos exitosamente!');
+                } else {
+                    alert('Guardado cancelado.');
+                }
+            } else {
+                alert('Primero seleccione archivos o carpetas.');
+            }
+        });
+
+        document.getElementById('back-button').addEventListener('click', () => {
+            window.location.href = '../index.html';
+        });
+    </script>
+</body>
+</html>

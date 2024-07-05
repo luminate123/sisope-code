@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electron App</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4C+6Xj5Y0N5UQbZj5f3G4e5y6js3TmUnHt0B8D/Zy0fzj5V+FpbL+JPL8YHCgYz4OU+Rw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+
+        h1 {
+            color: #444;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .container {
+            background: #fff;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .fs-info {
+            background: #e9f5ff;
+            padding: 15px;
+            border: 1px solid #d0e7ff;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .process-info {
+            background: #ffebec;
+            padding: 15px;
+            border: 1px solid #ffccd1;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        #myPieChart,
+        #cpu-chart {
+            max-width: 100%;
+            max-height: 400px;
+            margin: 0 auto;
+        }
+
+        .search-bar {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #ff4b5c;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #ff1f3d;
+        }
+
+        .sort-buttons {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .sort-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 5px;
+            transition: background-color 0.3s;
+        }
+
+        .sort-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Información del Sistema de Archivos</h1>
+    <div class="container">
+        <a href="pages/1.html" style="text-decoration:none; color:#007bff;">Link para comprimir</a>
+        <div id="fs-info-container"></div>
+        <!--<canvas id="myPieChart"></canvas>-->
+    </div>
+    <h1>Información de Procesos</h1>
+    <div class="container">
+        <div class="sort-buttons">
+            <button class="sort-button" onclick="sortProcesses('asc')">Ordenar por Memoria (Ascendente)</button>
+            <button class="sort-button" onclick="sortProcesses('desc')">Ordenar por Memoria (Descendente)</button>
+        </div>
+        <input type="text" id="process-search" class="search-bar" placeholder="Buscar por nombre o PID...">
+        <div id="processes-container"></div>
+        <canvas id="cpu-chart"></canvas>
+    </div>
+
+    <script>
+        let processes = [];
+        let sortOrder = ''; // Store the current sort order
+
+        async function updateFsInfo() {
+            try {
+                const fsInfoArray = await window.electronAPI.getFsInfo();
+                const container = document.getElementById('fs-info-container');
+                container.innerHTML = ''; // Clear existing content
+
+                fsInfoArray.forEach((fsInfo, index) => {
+                    const fsInfoDiv = document.createElement('div');
+                    fsInfoDiv.classList.add('fs-info');
+                    fsInfoDiv.innerHTML = `
+                        <strong>Filesystem ${index + 1}</strong><br>
+                        <strong>Filesystem:</strong> ${fsInfo.fs}<br>
+                        <strong>Type:</strong> ${fsInfo.type}<br>
+                        <strong>Size:</strong> ${fsInfo.size} GB<br>
+                        <strong>Used:</strong> ${fsInfo.used} GB<br>
+                        <strong>Available:</strong> ${fsInfo.available} GB<br>
+                        <strong>Use:</strong> ${fsInfo.use}%<br>
+                        <strong>Mount:</strong> ${fsInfo.mount}<br>
+                        <strong>Read/Write:</strong> ${fsInfo.rw ? 'Yes' : 'No'}<br>
+                    `;
+                    container.appendChild(fsInfoDiv);
+                });
+            } catch (err) {
+                document.getElementById('fs-info-container').innerText = 'Error fetching filesystem info';
+                console.error(err);
+            }
+        }
+
+        async function updateProcessInfo() {
+            try {
+                processes = await window.InformationSys.getProcesses();
+                sortProcesses(sortOrder); // Apply the current sort order
+                renderProcesses(); // Render processes immediately after fetching
+            } catch (err) {
+                document.getElementById('processes-container').innerText = 'Error fetching process info';
+                console.error(err);
+            }
+        }
+
+        function renderProcesses() {
+            const container = document.getElementById('processes-container');
+            const searchTerm = document.getElementById('process-search').value.toLowerCase();
+            container.innerHTML = ''; // Clear existing content
+
+            const filteredProcesses = processes.filter(processInfo => {
+                return processInfo.name.toLowerCase().includes(searchTerm) ||
+                    processInfo.pid.toString().includes(searchTerm);
+            });
+
+            filteredProcesses.forEach((processInfo, index) => {
+                const processInfoDiv = document.createElement('div');
+                processInfoDiv.classList.add('process-info');
+                processInfoDiv.innerHTML = `
+                    <strong>Process ${index + 1}</strong><br>
+                    <strong>PID:</strong> ${processInfo.pid}<br>
+                    <strong>Name:</strong> ${processInfo.name}<br>
+                    <strong>CPU:</strong> ${processInfo.cpu}%<br>
+                    <strong>Memory:</strong> ${processInfo.memory}<br>
+                    <strong>Memory Virtual:</strong> ${processInfo.memoryV}<br>
+                    <strong>Memory Real:</strong> ${processInfo.memoryR}<br>
+                    <strong>Status:</strong> ${processInfo.status}<br>
+                    <strong>Cmdline:</strong> ${processInfo.cmdline}<br>
+                    <button onclick="killProcess(${processInfo.pid})">Kill Process</button><br>
+                `;
+                container.appendChild(processInfoDiv);
+            });
+        }
+
+        function sortProcesses(order) {
+            sortOrder = order; // Update the current sort order
+            if (order === 'asc') {
+                processes.sort((a, b) => a.memory - b.memory);
+            } else if (order === 'desc') {
+                processes.sort((a, b) => b.memory - a.memory);
+            }
+            renderProcesses();
+        }
+
+        async function killProcess(pid) {
+            const result = await window.InformationSys.killProcess(pid);
+            if (result.error) {
+                alert(result.error);
+            } else {
+                alert(`Process ${pid} killed successfully`);
+            }
+            await updateProcessInfo(); // Update the process list after killing one
+        }
+
+        document.getElementById('process-search').addEventListener('input', renderProcesses);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateFsInfo();
+            updateProcessInfo();
+            setInterval(updateProcessInfo, 5000); // Update every 5 seconds
+        });
+    </script>
+</body>
+
+</html>
