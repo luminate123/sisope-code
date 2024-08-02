@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const si = require('systeminformation');
 const sudo = require('sudo-prompt');
-
+//informacion sistema de archivos
 contextBridge.exposeInMainWorld('electronAPI', {
   getFsInfo: async () => {
     try {
@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 });
-
+//informacion de los procesos
 contextBridge.exposeInMainWorld('InformationSys', {
   getProcesses: async () => {
     try {
@@ -34,8 +34,11 @@ contextBridge.exposeInMainWorld('InformationSys', {
         memory: process.mem,
         memoryV: process.memVsz,
         memoryR: process.memRss,
-        status: process.status,
-        cmdline: process.cmd
+        state: process.state,
+        command : process.command,
+        priority : process.priority
+
+
       }));
     } catch (error) {
       console.error('Error fetching process info:', error);
